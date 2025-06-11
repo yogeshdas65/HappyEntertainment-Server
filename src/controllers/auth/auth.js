@@ -118,6 +118,22 @@ export const createUser = async (request, reply) => {
   }
 };
 
+export const fetchEmployee = async (req, reply) => {
+  const { userId, role } = req.user;
+
+  if (role !== "ADMIN") {
+    return reply.code(403).send({ message: "Access denied. Admins only." });
+  }
+
+  try {
+    const employees = await User.find({ role: "EMPLOYEE" });
+    return reply.send(employees);
+  } catch (error) {
+    console.error("Error fetching employees:", error);
+    return reply.code(500).send({ message: "Server error while fetching employees." });
+  }
+};
+
 export const refreshToken = async (req, reply) => {
   const { refreshToken } = req.body;
   if (!refreshToken) {
