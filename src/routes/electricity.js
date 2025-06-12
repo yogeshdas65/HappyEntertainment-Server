@@ -1,4 +1,9 @@
-import  {newPlantCreation , getPlantNames , getSinglePlant}  from "../controllers/electricity/electricity.js";
+import {
+  newPlantCreation,
+  getPlantNames,
+  getSinglePlant,
+  getBillTypeChoice,
+} from "../controllers/electricity/electricity.js";
 import { verifyToken } from "../middleware/auth.js";
 
 export const electricityRoutes = async (fastify, options) => {
@@ -14,6 +19,8 @@ export const electricityRoutes = async (fastify, options) => {
     preHandler: [verifyToken],
     handler: getSinglePlant,
   });
+  fastify.get("/get-bills-by-type-choice", {
+    preHandler: [verifyToken],
+    handler: getBillTypeChoice,
+  });
 };
-
-
