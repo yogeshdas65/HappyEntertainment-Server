@@ -1,5 +1,16 @@
 import Electricity from "../../models/electricity.js";
 import mongoose from "mongoose";
+import { getNextBillNo } from "../../middleware/helper.js"; // adjust path as needed
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import fs from "fs";
+// AWS S3 Configuration
+const s3 = new S3Client({
+  region: process.env.S3_REGION,
+  credentials: {
+    accessKeyId: process.env.S3_ACCESS_KEY,
+    secretAccessKey: process.env.S3_SECRET_KEY,
+  },
+});
 
 export const newPlantCreation = async (req, reply) => {
   const { plantName, periodicBills, electricityBill } = req.body;
@@ -133,5 +144,186 @@ export const getBillTypeChoice = async (req, reply) => {
       error: "Failed to fetch bills using aggregation",
       details: error.message,
     });
+  }
+};
+
+export const addBillForPlant = async (req, reply) => {
+  try {
+    const { _id, billType, finalAmount, startDate, endDate } = req.body;
+    const file = req.file;
+
+    console.log("Received file:", file);
+    console.log("Received body:", req.body);
+
+    if (!_id || !billType || !file || !finalAmount || !startDate || !endDate) {
+      return reply.code(400).send({ message: "Missing required fields" });
+    }
+
+    // Determine subdocument path
+    const periodicBillTypes = [
+      "consultingFeesByOasis",
+      "dsmAdviceBills",
+      "forecastingAndSchedulingBills",
+      "consultingFeesByEnrich",
+      "amc",
+    ];
+    const electricityBillTypes = [
+      "energyInvoice",
+      "electricityBillForPlant",
+      "challan",
+    ];
+
+    let fullPath = "";
+    let useMonthlySchema = false;
+
+    if (periodicBillTypes.includes(billType)) {
+      fullPath = `periodicBills.${billType}`;
+    } else if (electricityBillTypes.includes(billType)) {
+      fullPath = `electricityBill.${billType}`;
+      useMonthlySchema = true;
+    } else {
+      return reply.code(400).send({ message: "Invalid billType provided" });
+    }
+
+    // Upload to S3
+    const fileBuffer = fs.readFileSync(file.path);
+    const fileKey = `bills/${Date.now()}_${file.originalname}`;
+
+    const uploadParams = {
+      Bucket: process.env.S3_BUCKET_NAME,
+      Key: fileKey,
+      Body: fileBuffer,
+      ContentType: file.mimetype,
+    };
+
+    await s3.send(new PutObjectCommand(uploadParams));
+    const receiptUrl = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.S3_REGION}.amazonaws.com/${fileKey}`;
+
+    // Delete local file
+    fs.unlinkSync(file.path);
+
+    // Prepare bill object
+    const bill = {
+      startDate: new Date(startDate),
+      endDate: new Date(endDate),
+      finalAmount: Number(finalAmount),
+      receiptUrl,
+      isPaid: false,
+    };
+
+    if (useMonthlySchema) {
+      // Add month & year
+      const start = new Date(startDate);
+      bill.month = start.toLocaleString('default', { month: 'long' });
+      bill.year = start.getFullYear();
+    } else {
+      // Add billNo for periodicBills only
+      bill.billNo = await getNextBillNo();
+    }
+
+    // Push into nested array
+    const updateData = {};
+    updateData[fullPath] = bill;
+
+    const updatedDoc = await Electricity.findByIdAndUpdate(
+      _id,
+      { $push: updateData },
+      { new: true }
+    );
+
+    if (!updatedDoc) {
+      return reply.code(404).send({ message: "Plant not found" });
+    }
+
+    return reply.code(200).send({
+      message: "Bill added successfully",
+      data: updatedDoc,
+    });
+  } catch (error) {
+    console.error("Error adding bill:", error);
+    return reply.code(500).send({ message: "Failed to add bill", error: error.message });
+  }
+};
+
+export const uploadPaymentScreenShot = async (req, reply) => {
+  try {
+    const { _id, billType, bill_id } = req.body;
+    const file = req.file;
+
+    if (!_id || !billType || !bill_id || !file) {
+      return reply.code(400).send({ message: "Missing required fields" });
+    }
+
+    // Upload screenshot to S3
+    const fileBuffer = fs.readFileSync(file.path);
+    const fileKey = `payment_screenshots/${Date.now()}_${file.originalname}`;
+
+    const uploadParams = {
+      Bucket: process.env.S3_BUCKET_NAME,
+      Key: fileKey,
+      Body: fileBuffer,
+      ContentType: file.mimetype,
+    };
+
+    await s3.send(new PutObjectCommand(uploadParams));
+    const paymentScreenshot = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.S3_REGION}.amazonaws.com/${fileKey}`;
+
+    // Delete local file
+    fs.unlinkSync(file.path);
+
+    // Define bill path
+    const periodicBillTypes = [
+      "consultingFeesByOasis",
+      "dsmAdviceBills",
+      "forecastingAndSchedulingBills",
+      "consultingFeesByEnrich",
+      "amc",
+    ];
+    const electricityBillTypes = [
+      "energyInvoice",
+      "electricityBillForPlant",
+      "challan",
+    ];
+
+    let arrayPath = '';
+    let isPeriodic = false;
+
+    if (periodicBillTypes.includes(billType)) {
+      arrayPath = `periodicBills.${billType}`;
+      isPeriodic = true;
+    } else if (electricityBillTypes.includes(billType)) {
+      arrayPath = `electricityBill.${billType}`;
+    } else {
+      return reply.code(400).send({ message: "Invalid billType" });
+    }
+
+    // Construct query & update
+    const updateQuery = {
+      _id,
+      [`${arrayPath}._id`]: bill_id,
+    };
+
+    const updateOperation = {
+      $set: {
+        [`${arrayPath}.$.isPaid`]: true,
+        [`${arrayPath}.$.paymentScreenshot`]: paymentScreenshot,
+      },
+    };
+
+    const updatedDoc = await Electricity.findOneAndUpdate(updateQuery, updateOperation, {
+      new: true,
+    });
+
+    if (!updatedDoc) {
+      return reply.code(404).send({ message: "Bill not found or Plant not found" });
+    }
+
+    return reply.code(200).send({
+      message: "Payment screenshot uploaded and bill marked as paid",
+      data: updatedDoc,
+    });
+  } catch (error) {
+    console.error("Error uploading payment screenshot:", error);
+    return reply.code(500).send({ message: "Internal Server Error", error: error.message });
   }
 };

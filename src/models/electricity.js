@@ -11,6 +11,7 @@ const BillSchema = new mongoose.Schema({
   finalAmount: { type: Number, required: true },
   isPaid: { type: Boolean, default: false },
   receiptUrl: { type: String, required: true },
+  paymentScreenshot: { type: String },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });
@@ -28,6 +29,7 @@ const MonthlyBillSchema = new mongoose.Schema({
   startDate: { type: Date, required: true },
   endDate: { type: Date, required: true },
   finalAmount: { type: Number, required: true },
+  maintenanceAmount: { type: Number, required: true, default: 0 },
   isPaid: { type: Boolean, default: false },
   receiptUrl: { type: String, required: true },
   createdAt: { type: Date, default: Date.now },

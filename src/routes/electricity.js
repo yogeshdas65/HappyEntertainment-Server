@@ -3,8 +3,12 @@ import {
   getPlantNames,
   getSinglePlant,
   getBillTypeChoice,
+  addBillForPlant,
+  uploadPaymentScreenShot,
 } from "../controllers/electricity/electricity.js";
 import { verifyToken } from "../middleware/auth.js";
+import multer from "fastify-multer";
+const upload = multer({ dest: "uploads/" });
 
 export const electricityRoutes = async (fastify, options) => {
   fastify.post("/create-new-plant", {
@@ -22,5 +26,13 @@ export const electricityRoutes = async (fastify, options) => {
   fastify.get("/get-bills-by-type-choice", {
     preHandler: [verifyToken],
     handler: getBillTypeChoice,
+  });
+  fastify.post("/add-bill-by-billtype", {
+    preHandler: [verifyToken, upload.single("file")],
+    handler: addBillForPlant,
+  });
+  fastify.post("/upload-payment-screenshot", {
+    preHandler: [verifyToken, upload.single("file")],
+    handler: uploadPaymentScreenShot,
   });
 };
