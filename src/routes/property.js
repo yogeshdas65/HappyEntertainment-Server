@@ -1,0 +1,19 @@
+import { newPropertyCreation , getallProperty, makePayment} from "../controllers/property/property.js";
+import { verifyToken } from "../middleware/auth.js";
+import multer from "fastify-multer";
+const upload = multer({ dest: "uploads/" });
+
+export const propertyRoutes = async (fastify, options) => {
+  fastify.post("/create-new-property", {
+    preHandler: [verifyToken , upload.single("file")],
+    handler: newPropertyCreation,
+  });
+  fastify.get("/get-property", {
+    preHandler: [verifyToken],
+    handler: getallProperty,
+  });
+  fastify.post("/make-payment-for-property", {
+    preHandler: [verifyToken , upload.single("file")],
+    handler: makePayment,
+  });
+};

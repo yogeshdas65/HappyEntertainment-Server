@@ -250,6 +250,9 @@ export const uploadPaymentScreenShot = async (req, reply) => {
     const { _id, billType, bill_id } = req.body;
     const file = req.file;
 
+    console.log("test", _id, billType, bill_id , file)
+    
+
     if (!_id || !billType || !bill_id || !file) {
       return reply.code(400).send({ message: "Missing required fields" });
     }
