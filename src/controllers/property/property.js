@@ -111,24 +111,31 @@ export const getallProperty = async (req, reply) => {
 export const makePayment = async (req, reply) => {
   try {
     const {
-      propertyId,
+      property_id,
       buildName,
+      tenantName,
       address,
       date,
       rent,
       pendingRent,
       gst,
       tds,
+      endDate,
+      startDate,
+      monthlyBill,
+      isPaid,
       assessmentBill,
       finalAmount,
       maintenance,
       electricityBill,
-      paymentScreenshot,
-      monthlyBill,
+      rentInstallment,
+      maintenanceInstallment,
+      electricityInstallment,
+      uploads, // { paymentScreenshot, monthlyBill }
     } = req.body;
 
     // Check if property exists
-    const property = await Property.findById(propertyId);
+    const property = await Property.findById(property_id);
     if (!property) {
       return reply
         .code(404)
@@ -137,11 +144,16 @@ export const makePayment = async (req, reply) => {
 
     // Create new payment record
     const payment = new PropertyPayment({
-      property_id: propertyId,
+      property_id,
       buildName,
+      tenantName,
       address,
       date,
       rent,
+      endDate,
+      startDate,
+      monthlyBill,
+      isPaid,
       pendingRent,
       gst,
       tds,
@@ -149,8 +161,10 @@ export const makePayment = async (req, reply) => {
       finalAmount,
       maintenance,
       electricityBill,
-      paymentScreenshot,
-      monthlyBill,
+      rentInstallment,
+      maintenanceInstallment,
+      electricityInstallment,
+      uploads,
     });
 
     await payment.save();

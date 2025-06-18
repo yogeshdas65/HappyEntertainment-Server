@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { type } from "os";
 
 const propertyPaymentSchema = new mongoose.Schema(
   {
@@ -7,6 +8,10 @@ const propertyPaymentSchema = new mongoose.Schema(
       required: true,
     },
     buildName: {
+      type: String,
+      required: true,
+    },
+    tenantName: {
       type: String,
       required: true,
     },
@@ -22,9 +27,21 @@ const propertyPaymentSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
-    status:{
-      type: Boolean,
-      default:false
+    isPaid:{
+      type:Boolean,
+      required:true
+    },
+    startDate:{
+      type:Date,
+      required:true
+    },
+    endDate:{
+      type:Date,
+      required:true
+    },
+    monthlyBill:{
+      type:String,
+      required:true
     },
     pendingRent: {
       type: Number,
@@ -67,13 +84,45 @@ const propertyPaymentSchema = new mongoose.Schema(
         required: true,
       },
     },
-    paymentScreenshot: {
-      type: String,
-      required: true,
+    rentInstallment: {
+      isInstallment: {
+        type: Boolean,
+        required: true,
+      },
+      amount: {
+        type: Number,
+        required: true,
+      },
     },
-    monthlyBill: {
-      type: String,
-      required: true,
+    maintenanceInstallment: {
+      isInstallment: {
+        type: Boolean,
+        required: true,
+      },
+      amount: {
+        type: Number,
+        required: true,
+      },
+    },
+    electricityInstallment: {
+      isInstallment: {
+        type: Boolean,
+        required: true,
+      },
+      amount: {
+        type: Number,
+        required: true,
+      },
+    },
+    uploads: {
+      paymentScreenshot: {
+        type: String,
+        required: true,
+      },
+      monthlyBill: {
+        type: String,
+        required: true,
+      },
     },
   },
   {
@@ -81,6 +130,8 @@ const propertyPaymentSchema = new mongoose.Schema(
   }
 );
 
-
-const PropertyPayment = mongoose.model("PropertyPayment", propertyPaymentSchema);
+const PropertyPayment = mongoose.model(
+  "PropertyPayment",
+  propertyPaymentSchema
+);
 export default PropertyPayment;
