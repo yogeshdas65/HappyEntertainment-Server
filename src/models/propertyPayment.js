@@ -117,11 +117,11 @@ const propertyPaymentSchema = new mongoose.Schema(
     uploads: {
       paymentScreenshot: {
         type: String,
-        required: true,
+        // required: true,
       },
       monthlyBill: {
         type: String,
-        required: true,
+        // required: true,
       },
     },
   },

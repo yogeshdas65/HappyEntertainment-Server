@@ -8,7 +8,7 @@ const eventSchema = new mongoose.Schema(
         ref: "Artist",
       },
     ],
-    sponsor: [
+    sponsors: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Sponsor",
