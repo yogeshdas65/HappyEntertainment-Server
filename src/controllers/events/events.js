@@ -3,6 +3,8 @@ import { getNextBillNo } from "../../middleware/helper.js"; // adjust path as ne
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import fs from "fs";
 import Event from "../../models/event.js";
+import Artist from "../../models/artist.js"
+import Sponsor from "../../models/sponsor.js"
 import EventArtistPayment from "../../models/eventArtistPayment.js";
 import EventSponsorPayment from "../../models/eventSponsorPayment.js";
 
@@ -51,6 +53,11 @@ export const newEventCreation = async (req, reply) => {
         artist_id: artists[i],
       });
       const savedArtistPayment = await newArtistPayment.save();
+
+      await Artist.findByIdAndUpdate(artists[i], {
+        $addToSet: { events: savedEvent._id }, // use $addToSet to avoid duplicates
+      });
+
     }
     for (let i = 0; i < sponsors.length; i++) {
       const newSponsorPayment = new EventSponsorPayment({
@@ -58,6 +65,10 @@ export const newEventCreation = async (req, reply) => {
         sponsor_id: sponsors[i],
       });
       const savedSponsorPayment = await newSponsorPayment.save();
+
+      await Sponsor.findByIdAndUpdate(sponsors[i], {
+        $addToSet: { events: savedEvent._id }, // use $addToSet to avoid duplicates
+      });
     }
 
     return reply.status(201).send({

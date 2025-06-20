@@ -12,6 +12,10 @@ const artistSchema = new mongoose.Schema(
       type:String,
       required:true
     },
+    netIncomeGenerated:{
+      type: Number,
+      default:0
+    },
     eventPreparationFinished: {
       type: Boolean,
       default: false,

@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 import { getNextBillNo } from "../../middleware/helper.js"; // adjust path as needed
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import fs from "fs";
-import  Artist  from "../../models/artist.js";
+import Artist from "../../models/artist.js";
 
 const s3 = new S3Client({
   region: process.env.S3_REGION,
@@ -40,14 +40,14 @@ export const newArtistCreation = async (req, reply) => {
       bankAccountName,
       bankAccountType,
     };
-    
+
     const missingFields = Object.entries(requiredFields)
       .filter(([key, value]) => !value)
       .map(([key]) => key);
-    
+
     if (missingFields.length > 0) {
       return reply.status(400).send({
-        message: `Missing required fields: ${missingFields.join(', ')}`,
+        message: `Missing required fields: ${missingFields.join(", ")}`,
       });
     }
 
@@ -69,12 +69,12 @@ export const newArtistCreation = async (req, reply) => {
     const savedArtist = await newArtist.save();
 
     return reply.status(201).send({
-      message: 'Artist created successfully',
+      message: "Artist created successfully",
       artist: savedArtist,
     });
   } catch (error) {
-    console.error('Error creating artist:', error);
-    return reply.status(500).send({ message: 'Internal Server Error' });
+    console.error("Error creating artist:", error);
+    return reply.status(500).send({ message: "Internal Server Error" });
   }
 };
 
@@ -87,25 +87,52 @@ export const getArtist = async (req, reply) => {
     if (name) {
       filter = {
         $or: [
-          { artistName: { $regex: name, $options: 'i' } },
-          { companyNameOfArtist: { $regex: name, $options: 'i' } },
+          { artistName: { $regex: name, $options: "i" } },
+          { companyNameOfArtist: { $regex: name, $options: "i" } },
         ],
       };
     }
 
     const artists = await Artist.find(filter)
       .sort({ createdAt: -1 })
-      // .populate('events'); // Uncomment if you want to populate events
+      .populate("events"); // Uncomment if you want to populate events
 
     return reply.code(200).send({
-      message: 'Artists fetched successfully',
+      message: "Artists fetched successfully",
       data: artists,
     });
   } catch (error) {
-    console.error('Error fetching artists:', error);
+    console.error("Error fetching artists:", error);
     return reply.code(500).send({
-      message: 'Failed to fetch artists',
+      message: "Failed to fetch artists",
       error: error.message,
+    });
+  }
+};
+
+export const getEventsDetailsOfSingleArtist = async (req, reply) => {
+  try {
+    const { _id } = req.query;
+
+    if (!events_id) {
+      return reply.status(400).send({ message: "Event ID is required" });
+    }
+
+    const artists = await EventArtistPayment.find({ events_id })
+      .populate("artist_id")
+      .populate("events_id");
+
+    return reply.code(200).send({
+      message: "Event payments fetched successfully",
+      data: {
+        artists,
+        sponsors,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching event payments:", error);
+    return reply.status(500).send({
+      message: "Something went wrong while fetching event payments",
     });
   }
 };
