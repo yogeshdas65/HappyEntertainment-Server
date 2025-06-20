@@ -109,13 +109,13 @@ export const getPaymentsOfSingleEvent = async (req, reply) => {
       return reply.status(400).send({ message: "Event ID is required" });
     }
 
-    const artists = await EventArtistPayment.find({ events_id }).populate(
-      "artist_id"
-    );
+    const artists = await EventArtistPayment.find({ events_id })
+      .populate("artist_id")
+      .populate("events_id");
 
-    const sponsors = await EventSponsorPayment.find({ events_id }).populate(
-      "sponsor_id"
-    );
+    const sponsors = await EventSponsorPayment.find({ events_id })
+      .populate("sponsor_id")
+      .populate("events_id");
 
     return reply.code(200).send({
       message: "Event payments fetched successfully",
@@ -129,5 +129,121 @@ export const getPaymentsOfSingleEvent = async (req, reply) => {
     return reply.status(500).send({
       message: "Something went wrong while fetching event payments",
     });
+  }
+};
+
+export const updateArtistPaymentOfEvent = async (req, reply) => {
+  try {
+    const {
+      _id,
+      feesOfArtist,
+      advanceFees,
+      tds,
+      finalAmount,
+      paymentReceipt,
+    } = req.body;
+
+    if (!_id) {
+      return reply.status(400).send({ message: 'Missing _id for update.' });
+    }
+
+    const updateFields = {};
+
+    // ✅ CONDITION 1: If paymentReceipt is present, ONLY update receipt + isPaid
+    if (paymentReceipt) {
+      updateFields.paymentReceipt = paymentReceipt;
+      updateFields.isPaid = true;
+    } else {
+      // ✅ CONDITION 2: If no paymentReceipt, update only fee-related fields
+      if (feesOfArtist !== undefined) {
+        updateFields.feesOfArtist = Number(feesOfArtist);
+      }
+      if (advanceFees !== undefined) {
+        updateFields.advanceFees = Number(advanceFees);
+      }
+      if (tds !== undefined) {
+        updateFields.tds = Number(tds);
+      }
+      if (finalAmount !== undefined) {
+        updateFields.finalAmount = Number(finalAmount);
+      }
+    }
+
+    const updated = await EventArtistPayment.findByIdAndUpdate(
+      _id,
+      { $set: updateFields },
+      { new: true }
+    );
+
+    if (!updated) {
+      return reply.status(404).send({ message: 'Artist payment record not found.' });
+    }
+
+    return reply.send({
+      message: 'Artist payment updated successfully.',
+      data: updated,
+    });
+
+  } catch (error) {
+    console.error('Error updating artist payment:', error);
+    return reply.status(500).send({ message: 'Internal server error.' });
+  }
+};
+
+export const updateSponsorPaymentOfEvent = async (req, reply) => {
+  try {
+    const {
+      _id,
+      donationBySponsor,
+      advanceDonation,
+      gst,
+      finalAmount,
+      paymentReceipt,
+    } = req.body;
+
+    if (!_id) {
+      return reply.status(400).send({ message: 'Missing _id for update.' });
+    }
+
+    const updateFields = {};
+
+    // ✅ CONDITION 1: If paymentReceipt is present, ONLY update receipt + isPaid
+    if (paymentReceipt) {
+      updateFields.paymentReceipt = paymentReceipt;
+      updateFields.isPaid = true;
+    } else {
+      // ✅ CONDITION 2: If no paymentReceipt, update only fee-related fields
+      if (donationBySponsor !== undefined) {
+        updateFields.donationBySponsor = Number(donationBySponsor);
+      }
+      if (advanceDonation !== undefined) {
+        updateFields.advanceDonation = Number(advanceDonation);
+      }
+      if (gst !== undefined) {
+        updateFields.gst = Number(gst);
+      }
+      if (finalAmount !== undefined) {
+        updateFields.finalAmount = Number(finalAmount);
+      }
+    }
+
+    const updated = await EventSponsorPayment.findByIdAndUpdate(
+      _id,
+      { $set: updateFields },
+      { new: true }
+    );
+
+    if (!updated) {
+      return reply.status(404).send({ message: 'Sponsor payment record not found.' });
+    }
+
+    return reply.send({
+      message: 'Sponsor payment updated successfully.',
+      data: updated,
+    });
+
+  } catch (error) {
+    console.error('Error updating Sponsor payment:', error);
+    return reply.status(500).send({ message: 'Internal server error.' });
   }
 };

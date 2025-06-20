@@ -28,6 +28,10 @@ const eventSponsorPaymentSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    finalAmount:{
+      type: Number,
+      default: 0,
+    },
     paymentReceipt: {
       type: String,
     },
