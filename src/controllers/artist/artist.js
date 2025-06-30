@@ -3,6 +3,7 @@ import { getNextBillNo } from "../../middleware/helper.js"; // adjust path as ne
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import fs from "fs";
 import Artist from "../../models/artist.js";
+import EventArtistPayment from "../../models/eventArtistPayment.js";
 
 const s3 = new S3Client({
   region: process.env.S3_REGION,
@@ -78,7 +79,7 @@ export const newArtistCreation = async (req, reply) => {
   }
 };
 
-export const getArtist = async (req, reply) => {
+export const getArtistList = async (req, reply) => {
   try {
     const { name } = req.query;
 
@@ -93,9 +94,8 @@ export const getArtist = async (req, reply) => {
       };
     }
 
-    const artists = await Artist.find(filter)
-      .sort({ createdAt: -1 })
-      .populate("events"); // Uncomment if you want to populate events
+    const artists = await Artist.find(filter).sort({ createdAt: -1 });
+    // .populate("events"); // Uncomment if you want to populate events
 
     return reply.code(200).send({
       message: "Artists fetched successfully",
@@ -110,29 +110,69 @@ export const getArtist = async (req, reply) => {
   }
 };
 
-export const getEventsDetailsOfSingleArtist = async (req, reply) => {
+export const getArtistEventList = async (req, reply) => {
   try {
-    const { _id } = req.query;
+    const { _id, name } = req.query;
 
-    if (!events_id) {
-      return reply.status(400).send({ message: "Event ID is required" });
+    if (!_id) {
+      return reply.code(400).send({ message: "Artist ID (_id) is required" });
     }
 
-    const artists = await EventArtistPayment.find({ events_id })
-      .populate("artist_id")
-      .populate("events_id");
+    const artist = await Artist.findById(_id).populate({
+      path: "events",
+      options: { sort: { date: -1 } },
+    });
+
+    if (!artist) {
+      return reply.code(404).send({ message: "Artist not found" });
+    }
+
+    let filteredEvents = artist.events;
+    if (name) {
+      const regex = new RegExp(name, "i"); // case-insensitive
+      filteredEvents = artist.events.filter((event) =>
+        regex.test(event.eventName)
+      );
+    }
+
+    return reply.code(200).send({
+      message: "Artist fetched successfully",
+      data: {
+        ...artist.toObject(),
+        events: filteredEvents, // return only filtered events
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching artist events:", error);
+    return reply.code(500).send({
+      message: "Failed to fetch artist events",
+      error: error.message,
+    });
+  }
+};
+
+export const getPaymentsOfSingleEventOfArtist = async (req, reply) => {
+  try {
+    const { events_id, artist_id } = req.query;
+
+    if (!events_id || !artist_id) {
+      return reply.status(400).send({
+        message: "Both events_id and artist_id are required",
+      });
+    }
+
+    const payments = await EventArtistPayment.find({ events_id, artist_id })
+      
 
     return reply.code(200).send({
       message: "Event payments fetched successfully",
-      data: {
-        artists,
-        sponsors,
-      },
+      data: payments,
     });
   } catch (error) {
     console.error("Error fetching event payments:", error);
     return reply.status(500).send({
       message: "Something went wrong while fetching event payments",
+      error: error.message,
     });
   }
 };
