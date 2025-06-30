@@ -55,7 +55,16 @@ export const newSponsorCreation = async (req, reply) => {
 
 export const getSponsors = async (req, reply) => {
   try {
-    const { name } = req.query;
+    const { name, selectedRoles } = req.query;
+    console.log("name:", name);
+    const roles = Array.isArray(selectedRoles)
+      ? selectedRoles
+      : selectedRoles
+      ? [selectedRoles]
+      : [];
+
+      console.log("selectedRoles:", typeof roles, roles); // might be string or array
+
 
     let filter = {};
 
@@ -67,6 +76,12 @@ export const getSponsors = async (req, reply) => {
         ],
       };
     }
+
+      // Filter by selectedRoles if provided
+      if (roles.length > 0) {
+        filter.sponsorIndustry = { $in: roles };
+      }
+  
 
     const sponsors = await Sponsor.find(filter)
       .sort({ createdAt: -1 })
