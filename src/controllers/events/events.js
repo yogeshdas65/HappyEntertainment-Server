@@ -3,8 +3,8 @@ import { getNextBillNo } from "../../middleware/helper.js"; // adjust path as ne
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import fs from "fs";
 import Event from "../../models/event.js";
-import Artist from "../../models/artist.js"
-import Sponsor from "../../models/sponsor.js"
+import Artist from "../../models/artist.js";
+import Sponsor from "../../models/sponsor.js";
 import EventArtistPayment from "../../models/eventArtistPayment.js";
 import EventSponsorPayment from "../../models/eventSponsorPayment.js";
 
@@ -57,7 +57,6 @@ export const newEventCreation = async (req, reply) => {
       await Artist.findByIdAndUpdate(artists[i], {
         $addToSet: { events: savedEvent._id }, // use $addToSet to avoid duplicates
       });
-
     }
     for (let i = 0; i < sponsors.length; i++) {
       const newSponsorPayment = new EventSponsorPayment({
@@ -77,6 +76,112 @@ export const newEventCreation = async (req, reply) => {
     });
   } catch (error) {
     console.error("Error creating event:", error);
+    return reply.status(500).send({ message: "Internal Server Error" });
+  }
+};
+
+export const updateEvent = async (req, reply) => {
+  try {
+    const { _id } = req.params;
+    const { eventName, eventDate, artists = [], sponsors = [] } = req.body;
+    console.log(eventName, eventDate, artists, sponsors);
+
+    if (!eventName || !eventDate) {
+      return reply
+        .status(400)
+        .send({ message: "Event name and date are required." });
+    }
+
+    if (!Array.isArray(artists) || !Array.isArray(sponsors)) {
+      return reply
+        .status(400)
+        .send({ message: "Artists and Sponsors must be arrays." });
+    }
+
+    // Fetch existing event
+    const existingEvent = await Event.findById(_id);
+    if (!existingEvent) {
+      return reply.status(404).send({ message: "Event not found." });
+    }
+
+    // Old and new artist/sponsor ID sets
+    const oldArtistIds = existingEvent.artists.map((id) => id.toString());
+    const oldSponsorIds = existingEvent.sponsors.map((id) => id.toString());
+
+    const newArtistIds = artists.map((id) => id.toString());
+    const newSponsorIds = sponsors.map((id) => id.toString());
+
+    // Find artists to add and remove
+    const artistsToAdd = newArtistIds.filter(
+      (id) => !oldArtistIds.includes(id)
+    );
+    const artistsToRemove = oldArtistIds.filter(
+      (id) => !newArtistIds.includes(id)
+    );
+
+    // Find sponsors to add and remove
+    const sponsorsToAdd = newSponsorIds.filter(
+      (id) => !oldSponsorIds.includes(id)
+    );
+    const sponsorsToRemove = oldSponsorIds.filter(
+      (id) => !newSponsorIds.includes(id)
+    );
+
+    // Update event
+    existingEvent.eventName = eventName;
+    existingEvent.eventDate = eventDate;
+    existingEvent.artists = newArtistIds;
+    existingEvent.sponsors = newSponsorIds;
+    const updatedEvent = await existingEvent.save();
+
+    // Update Artist references
+    for (let id of artistsToAdd) {
+      await Artist.findByIdAndUpdate(id, {
+        $addToSet: { events: existingEvent._id },
+      });
+      await new EventArtistPayment({
+        events_id: existingEvent._id,
+        artist_id: id,
+      }).save();
+    }
+
+    for (let id of artistsToRemove) {
+      await Artist.findByIdAndUpdate(id, {
+        $pull: { events: existingEvent._id },
+      });
+      await EventArtistPayment.deleteOne({
+        events_id: existingEvent._id,
+        artist_id: id,
+      });
+    }
+
+    // Update Sponsor references
+    for (let id of sponsorsToAdd) {
+      await Sponsor.findByIdAndUpdate(id, {
+        $addToSet: { events: existingEvent._id },
+      });
+      await new EventSponsorPayment({
+        events_id: existingEvent._id,
+        sponsor_id: id,
+      }).save();
+    }
+
+    for (let id of sponsorsToRemove) {
+      await Sponsor.findByIdAndUpdate(id, {
+        $pull: { events: existingEvent._id },
+      });
+      await EventSponsorPayment.deleteOne({
+        events_id: existingEvent._id,
+        sponsor_id: id,
+      });
+    }
+
+    return reply.status(200).send({
+      message: "Event updated successfully",
+      data: updatedEvent,
+    });
+  } catch (error) {
+    console.error("Error updating event:", error);
     return reply.status(500).send({ message: "Internal Server Error" });
   }
 };
@@ -145,17 +250,11 @@ export const getPaymentsOfSingleEvent = async (req, reply) => {
 
 export const updateArtistPaymentOfEvent = async (req, reply) => {
   try {
-    const {
-      _id,
-      feesOfArtist,
-      advanceFees,
-      tds,
-      finalAmount,
-      paymentReceipt,
-    } = req.body;
+    const { _id, feesOfArtist, advanceFees, tds, finalAmount, paymentReceipt } =
+      req.body;
 
     if (!_id) {
-      return reply.status(400).send({ message: 'Missing _id for update.' });
+      return reply.status(400).send({ message: "Missing _id for update." });
     }
 
     const updateFields = {};
@@ -187,17 +286,18 @@ export const updateArtistPaymentOfEvent = async (req, reply) => {
     );
 
     if (!updated) {
-      return reply.status(404).send({ message: 'Artist payment record not found.' });
+      return reply
+        .status(404)
+        .send({ message: "Artist payment record not found." });
     }
 
     return reply.send({
-      message: 'Artist payment updated successfully.',
+      message: "Artist payment updated successfully.",
       data: updated,
     });
-
   } catch (error) {
-    console.error('Error updating artist payment:', error);
-    return reply.status(500).send({ message: 'Internal server error.' });
+    console.error("Error updating artist payment:", error);
+    return reply.status(500).send({ message: "Internal server error." });
   }
 };
 
@@ -213,7 +313,7 @@ export const updateSponsorPaymentOfEvent = async (req, reply) => {
     } = req.body;
 
     if (!_id) {
-      return reply.status(400).send({ message: 'Missing _id for update.' });
+      return reply.status(400).send({ message: "Missing _id for update." });
     }
 
     const updateFields = {};
@@ -245,16 +345,17 @@ export const updateSponsorPaymentOfEvent = async (req, reply) => {
     );
 
     if (!updated) {
-      return reply.status(404).send({ message: 'Sponsor payment record not found.' });
+      return reply
+        .status(404)
+        .send({ message: "Sponsor payment record not found." });
     }
 
     return reply.send({
-      message: 'Sponsor payment updated successfully.',
+      message: "Sponsor payment updated successfully.",
       data: updated,
     });
-
   } catch (error) {
-    console.error('Error updating Sponsor payment:', error);
-    return reply.status(500).send({ message: 'Internal server error.' });
+    console.error("Error updating Sponsor payment:", error);
+    return reply.status(500).send({ message: "Internal server error." });
   }
 };

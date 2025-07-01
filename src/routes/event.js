@@ -3,7 +3,8 @@ import {
   getEvents,
   getPaymentsOfSingleEvent,
   updateArtistPaymentOfEvent,
-  updateSponsorPaymentOfEvent
+  updateSponsorPaymentOfEvent,
+  updateEvent
 } from "../controllers/events/events.js";
 import { verifyToken } from "../middleware/auth.js";
 import multer from "fastify-multer";
@@ -13,6 +14,10 @@ export const eventsRoutes = async (fastify, options) => {
   fastify.post("/create-new-event", {
     preHandler: [verifyToken, upload.single("file")],
     handler: newEventCreation,
+  });
+  fastify.put("/update-event/:_id", {
+    preHandler: [verifyToken, upload.single("file")],
+    handler: updateEvent,
   });
   fastify.get("/get-events", {
     preHandler: [verifyToken, upload.single("file")],

@@ -53,6 +53,50 @@ export const newSponsorCreation = async (req, reply) => {
   }
 };
 
+export const updateSponsor = async (req, reply) => {
+  try {
+    const { _id } = req.params;
+    const {
+      sponsorName,
+      sponsorIndustry,
+      phoneNumber,
+      emailId,
+      address,
+      gst,
+      eventPreparationFinished,
+    } = req.body;
+
+    // Basic validation (same as create)
+    if (!sponsorName || !phoneNumber || !emailId || !address || !gst) {
+      return reply.status(400).send({ message: "Missing required fields" });
+    }
+
+    const sponsor = await Sponsor.findById(_id);
+    if (!sponsor) {
+      return reply.status(404).send({ message: "Sponsor not found." });
+    }
+
+    // Update fields (except `events`)
+    sponsor.sponsorName = sponsorName;
+    sponsor.sponsorIndustry = sponsorIndustry || [];
+    sponsor.phoneNumber = phoneNumber;
+    sponsor.emailId = emailId;
+    sponsor.address = address;
+    sponsor.gst = gst;
+    sponsor.eventPreparationFinished = eventPreparationFinished;
+
+    const updatedSponsor = await sponsor.save();
+
+    reply.status(200).send({
+      message: "Sponsor updated successfully",
+      sponsor: updatedSponsor,
+    });
+  } catch (error) {
+    console.error("Error updating sponsor:", error);
+    reply.status(500).send({ message: "Internal Server Error" });
+  }
+};
+
 export const getSponsors = async (req, reply) => {
   try {
     const { name, selectedRoles } = req.query;

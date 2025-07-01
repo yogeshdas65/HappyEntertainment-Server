@@ -2,7 +2,8 @@ import {
   newArtistCreation,
   getArtistList,
   getPaymentsOfSingleEventOfArtist,
-  getArtistEventList
+  getArtistEventList,
+  updateArtist
 } from "../controllers/artist/artist.js";
 import { verifyToken } from "../middleware/auth.js";
 import multer from "fastify-multer";
@@ -12,6 +13,10 @@ export const artistRoutes = async (fastify, options) => {
   fastify.post("/create-new-artist", {
     preHandler: [verifyToken, upload.single("file")],
     handler: newArtistCreation,
+  });
+  fastify.put("/update-artist/:_id", {
+    preHandler: [verifyToken, upload.single("file")],
+    handler: updateArtist,
   });
   
   fastify.get("/get-artist", {

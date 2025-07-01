@@ -79,6 +79,75 @@ export const newArtistCreation = async (req, reply) => {
   }
 };
 
+export const updateArtist = async (req, reply) => {
+  try {
+    const { _id } = req.params;
+    const {
+      artistName,
+      companyNameOfArtist,
+      aadharCardNumber,
+      pancardNumber,
+      bankAccountNumber,
+      bankIfscCode,
+      bankAccountName,
+      bankAccountType,
+      gst,
+      roles,
+      eventPreparationFinished,
+    } = req.body;
+
+    // Basic validation
+    const requiredFields = {
+      artistName,
+      companyNameOfArtist,
+      aadharCardNumber,
+      pancardNumber,
+      bankAccountNumber,
+      bankIfscCode,
+      bankAccountName,
+      bankAccountType,
+    };
+
+    const missingFields = Object.entries(requiredFields)
+      .filter(([key, value]) => !value)
+      .map(([key]) => key);
+
+    if (missingFields.length > 0) {
+      return reply.status(400).send({
+        message: `Missing required fields: ${missingFields.join(", ")}`,
+      });
+    }
+
+    const artist = await Artist.findById(_id);
+    if (!artist) {
+      return reply.status(404).send({ message: "Artist not found." });
+    }
+
+    // Update fields
+    artist.artistName = artistName;
+    artist.companyNameOfArtist = companyNameOfArtist;
+    artist.aadharCardNumber = aadharCardNumber;
+    artist.pancardNumber = pancardNumber;
+    artist.bankAccountNumber = bankAccountNumber;
+    artist.bankIfscCode = bankIfscCode;
+    artist.bankAccountName = bankAccountName;
+    artist.bankAccountType = bankAccountType;
+    artist.gst = gst;
+    artist.roles = roles || [];
+    artist.eventPreparationFinished = eventPreparationFinished;
+
+    const updatedArtist = await artist.save();
+
+    return reply.status(200).send({
+      message: "Artist updated successfully",
+      artist: updatedArtist,
+    });
+  } catch (error) {
+    console.error("Error updating artist:", error);
+    return reply.status(500).send({ message: "Internal Server Error" });
+  }
+};
+
 export const getArtistList = async (req, reply) => {
   try {
     const { name, selectedRoles } = req.query;
