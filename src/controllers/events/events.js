@@ -359,3 +359,54 @@ export const updateSponsorPaymentOfEvent = async (req, reply) => {
     return reply.status(500).send({ message: "Internal server error." });
   }
 };
+
+export const uploadArtistPaymentReceipt = async (req, reply) => {
+  try {
+    const { _id } = req.body;
+    const file = req.file;
+
+    if (!_id || !file) {
+      return reply.code(400).send({ message: "Missing required fields (_id, file)" });
+    }
+
+    // Upload file to S3
+    const fileBuffer = fs.readFileSync(file.path);
+    const fileKey = `artist_payments/${Date.now()}_${file.originalname}`;
+
+    const uploadParams = {
+      Bucket: process.env.S3_BUCKET_NAME,
+      Key: fileKey,
+      Body: fileBuffer,
+      ContentType: file.mimetype,
+    };
+
+    await s3.send(new PutObjectCommand(uploadParams));
+    const fileUrl = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.S3_REGION}.amazonaws.com/${fileKey}`;
+
+    // Delete local file
+    fs.unlinkSync(file.path);
+
+    // Update payment document
+    const updatedPayment = await EventArtistPayment.findByIdAndUpdate(
+      _id,
+      {
+        paymentReceipt: fileUrl,
+        isPaid: true,
+      },
+      { new: true }
+    );
+
+    if (!updatedPayment) {
+      return reply.code(404).send({ message: "Payment record not found" });
+    }
+
+    return reply.code(200).send({
+      message: "Payment receipt uploaded successfully",
+      data: updatedPayment,
+    });
+
+  } catch (error) {
+    console.error("Error uploading receipt:", error);
+    return reply.code(500).send({ message: "Internal Server Error", error: error.message });
+  }
+};

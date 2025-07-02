@@ -13,21 +13,66 @@ const s3 = new S3Client({
 });
 
 export const newPlantCreation = async (req, reply) => {
-  const { plantName, periodicBills, electricityBill } = req.body;
-  try {
-    const newDoc = new Electricity({
-      plantName,
-      periodicBills,
-      electricityBill,
+  
+  const parts = await req.parts();
+  let plantName = '';
+
+  for await (const part of parts) {
+    if (part.type === 'field' && part.fieldname === 'plantName') {
+      plantName = part.value;
+    }
+  }
+
+  console.log('Parsed plantName:', plantName);
+
+  // Step 1: Validate presence
+  if (!plantName || typeof plantName !== 'string' || plantName.trim() === '') {
+    return reply.code(400).send({
+      error: 'Validation Error',
+      message: 'Plant name is required and must be a non-empty string.',
     });
+  }
+
+  try {
+    // Step 2 (optional): Check for duplicates
+    const existing = await Electricity.findOne({ plantName: plantName.trim() });
+    if (existing) {
+      return reply.code(409).send({
+        error: 'Conflict',
+        message: 'A plant with this name already exists.',
+      });
+    }
+
+    // Step 3: Create new plant
+    const newDoc = new Electricity({
+      plantName: plantName.trim(),
+      // The below can be omitted if schema already has default empty arrays
+      periodicBills: {
+        consultingFeesByOasis: [],
+        dsmAdviceBills: [],
+        forecastingAndSchedulingBills: [],
+        consultingFeesByEnrich: [],
+        amc: [],
+      },
+      electricityBill: {
+        energyInvoice: [],
+        electricityBillForPlant: [],
+        challan: [],
+      },
+    });
+
     await newDoc.save();
-    console.log("Electricity data saved successfully.");
-    reply
-      .code(201)
-      .send({ message: "Electricity data saved successfully.", data: newDoc });
+
+    reply.code(201).send({
+      message: 'Electricity plant created successfully.',
+      data: newDoc,
+    });
   } catch (error) {
-    console.error("Error saving electricity data:", error);
-    reply.code(500).send({ error: "Failed to save electricity data." });
+    console.error('Error saving electricity data:', error);
+    reply.code(500).send({
+      error: 'Internal Server Error',
+      message: 'Failed to save electricity data.',
+    });
   }
 };
 
@@ -330,3 +375,22 @@ export const uploadPaymentScreenShot = async (req, reply) => {
     return reply.code(500).send({ message: "Internal Server Error", error: error.message });
   }
 };
+
+// export const newPlantCreation = async (req, reply) => {
+//   const { plantName, periodicBills, electricityBill } = req.body;
+//   try {
+//     const newDoc = new Electricity({
+//       plantName,
+//       periodicBills,
+//       electricityBill,
+//     });
+//     await newDoc.save();
+//     console.log("Electricity data saved successfully.");
+//     reply
+//       .code(201)
+//       .send({ message: "Electricity data saved successfully.", data: newDoc });
+//   } catch (error) {
+//     console.error("Error saving electricity data:", error);
+//     reply.code(500).send({ error: "Failed to save electricity data." });
+//   }
+// };

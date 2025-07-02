@@ -4,7 +4,8 @@ import {
   getPaymentsOfSingleEvent,
   updateArtistPaymentOfEvent,
   updateSponsorPaymentOfEvent,
-  updateEvent
+  updateEvent,
+  uploadArtistPaymentReceipt
 } from "../controllers/events/events.js";
 import { verifyToken } from "../middleware/auth.js";
 import multer from "fastify-multer";
@@ -35,4 +36,9 @@ export const eventsRoutes = async (fastify, options) => {
     preHandler: [verifyToken, upload.single("file")],
     handler: updateSponsorPaymentOfEvent,
   });
+  fastify.put("/upload-artist-payment-receipt", {
+    preHandler: [verifyToken, upload.single("file")],
+    handler: uploadArtistPaymentReceipt,
+  });
+  
 };
