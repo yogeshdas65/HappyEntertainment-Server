@@ -360,53 +360,93 @@ export const updateSponsorPaymentOfEvent = async (req, reply) => {
   }
 };
 
-export const uploadArtistPaymentReceipt = async (req, reply) => {
+export const uploadPaymentReceipt = async (req, reply) => {
   try {
-    const { _id } = req.body;
+    const { _id, role } = req.body;
     const file = req.file;
 
-    if (!_id || !file) {
-      return reply.code(400).send({ message: "Missing required fields (_id, file)" });
+    // Validate inputs
+    if (!_id || !file || !role) {
+      return reply
+        .code(400)
+        .send({ message: "Missing required fields (_id, file, role)" });
     }
 
-    // Upload file to S3
+    // Determine S3 folder
+    const folder =
+      role === "artist"
+        ? "artist_payments"
+        : role === "sponsor"
+        ? "sponsor_payments"
+        : "other_payments";
+
+    const fileKey = `${folder}/${Date.now()}_${file.originalname}`;
     const fileBuffer = fs.readFileSync(file.path);
-    const fileKey = `artist_payments/${Date.now()}_${file.originalname}`;
 
     const uploadParams = {
       Bucket: process.env.S3_BUCKET_NAME,
       Key: fileKey,
       Body: fileBuffer,
+      // ACL: 'public-read',
       ContentType: file.mimetype,
     };
 
     await s3.send(new PutObjectCommand(uploadParams));
+
     const fileUrl = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.S3_REGION}.amazonaws.com/${fileKey}`;
 
     // Delete local file
     fs.unlinkSync(file.path);
 
-    // Update payment document
-    const updatedPayment = await EventArtistPayment.findByIdAndUpdate(
-      _id,
-      {
-        paymentReceipt: fileUrl,
-        isPaid: true,
-      },
-      { new: true }
-    );
+    let updatedPayment = null;
 
-    if (!updatedPayment) {
-      return reply.code(404).send({ message: "Payment record not found" });
+    if (role === "artist") {
+      const paymentDoc = await EventArtistPayment.findById(_id);
+      if (!paymentDoc) {
+        return reply
+          .code(404)
+          .send({ message: "Artist payment record not found" });
+      }
+
+      const installmentNumber = paymentDoc.paymentReceipts.length + 1;
+
+      paymentDoc.paymentReceipts.push({
+        installmentNumber,
+        receiptUrl: fileUrl,
+      });
+
+      updatedPayment = await paymentDoc.save();
+    } else if (role === "sponsor") {
+      const paymentDoc = await EventSponsorPayment.findById(_id);
+      if (!paymentDoc) {
+        return reply
+          .code(404)
+          .send({ message: "Sponsor payment record not found" });
+      }
+
+      const installmentNumber = paymentDoc.paymentReceipts.length + 1;
+
+      paymentDoc.paymentReceipts.push({
+        installmentNumber,
+        receiptUrl: fileUrl,
+      });
+
+      updatedPayment = await paymentDoc.save();
+    } else {
+      return reply
+        .code(400)
+        .send({ message: "Invalid role. Must be 'artist' or 'sponsor'" });
     }
 
     return reply.code(200).send({
       message: "Payment receipt uploaded successfully",
       data: updatedPayment,
     });
-
   } catch (error) {
     console.error("Error uploading receipt:", error);
-    return reply.code(500).send({ message: "Internal Server Error", error: error.message });
+    return reply.code(500).send({
+      message: "Internal Server Error",
+      error: error.message,
+    });
   }
 };

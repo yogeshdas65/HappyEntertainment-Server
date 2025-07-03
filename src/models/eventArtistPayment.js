@@ -1,5 +1,23 @@
 import mongoose from "mongoose";
 
+const receiptSchema = new mongoose.Schema(
+  {
+    installmentNumber: {
+      type: Number,
+      required: true,
+    },
+    receiptUrl: {
+      type: String,
+      required: true,
+    },
+    date: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+  { _id: false } 
+);
+
 const eventArtistPaymentSchema = new mongoose.Schema(
   {
     events_id: {
@@ -28,13 +46,11 @@ const eventArtistPaymentSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
-    finalAmount:{
+    finalAmount: {
       type: Number,
       default: 0,
     },
-    paymentReceipt: {
-      type: String,
-    },
+    paymentReceipts: [receiptSchema],
   },
   {
     timestamps: true,

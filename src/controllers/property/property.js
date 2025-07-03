@@ -77,6 +77,71 @@ export const newPropertyCreation = async (req, reply) => {
   }
 };
 
+export const updateProperty = async (req, reply) => {
+  try {
+    const {
+      buildName,
+      tenantName,
+      rent,
+      maintenanceAmount,
+      aadharCardNumber,
+      pancardNumber,
+      bankAccountName,
+      bankAccountType,
+      bankAccountNumber,
+      bankIfscCode,
+      gst,
+      startDate,
+      endDate,
+    } = req.body;
+
+    const { _id } = req.params;
+
+    if (!_id) {
+      return reply.code(400).send({
+        message: 'Property ID is required for update',
+      });
+    }
+
+    const updatedProperty = await Property.findByIdAndUpdate(
+      _id,
+      {
+        buildName,
+        tenantName,
+        rent,
+        maintenanceAmount,
+        aadharCardNumber,
+        pancardNumber,
+        bankAccountName,
+        bankAccountType,
+        bankAccountNumber,
+        bankIfscCode,
+        gst,
+        startDate,
+        endDate,
+      },
+      { new: true }
+    );
+
+    if (!updatedProperty) {
+      return reply.code(404).send({
+        message: 'Property not found',
+      });
+    }
+
+    return reply.code(200).send({
+      message: 'Property updated successfully',
+      data: updatedProperty,
+    });
+  } catch (error) {
+    console.error('Error updating property:', error);
+    return reply.code(500).send({
+      message: 'Failed to update property',
+      error: error.message,
+    });
+  }
+};
+
 export const getallProperty = async (req, reply) => {
   try {
     const { name } = req.query;
