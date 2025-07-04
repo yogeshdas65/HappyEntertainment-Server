@@ -53,7 +53,6 @@ const eventSponsorPaymentSchema = new mongoose.Schema(
     paymentReceipts: [receiptSchema],
     invoiceBill: {
       type: String,
-      required: true,
     },
   },
   {

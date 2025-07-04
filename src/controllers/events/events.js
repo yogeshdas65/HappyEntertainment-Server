@@ -199,7 +199,7 @@ export const getEvents = async (req, reply) => {
     }
 
     const events = await Event.find(filter)
-      .sort({ createdAt: -1 })
+      .sort({ updatedAt: -1 })
       .populate("artists")
       .populate("sponsors")
       .limit(20);
@@ -378,7 +378,9 @@ export const uploadPaymentReceipt = async (req, reply) => {
         ? "artist_payments"
         : role === "sponsor"
         ? "sponsor_payments"
-        : "other_payments";
+        : role === "sponsor-invoice"
+        ? "invoice_payment"
+        : "other_payment";
 
     const fileKey = `${folder}/${Date.now()}_${file.originalname}`;
     const fileBuffer = fs.readFileSync(file.path);
@@ -432,10 +434,24 @@ export const uploadPaymentReceipt = async (req, reply) => {
       });
 
       updatedPayment = await paymentDoc.save();
+    } else if (role === "sponsor-invoice") {
+      const paymentInvoiceDoc = await EventSponsorPayment.findById(_id);
+      if (!paymentInvoiceDoc) {
+        return reply
+          .code(404)
+          .send({ message: "Sponsor payment record not found" });
+      }
+
+      paymentInvoiceDoc.invoiceBill = fileUrl;
+
+      updatedPayment = await paymentInvoiceDoc.save();
     } else {
       return reply
         .code(400)
-        .send({ message: "Invalid role. Must be 'artist' or 'sponsor'" });
+        .send({
+          message:
+            "Invalid role. Must be 'artist', 'sponsor', or 'sponsor-invoice'",
+        });
     }
 
     return reply.code(200).send({

@@ -243,7 +243,9 @@ export const getPaymentsOfSingleEventOfArtist = async (req, reply) => {
       });
     }
 
-    const payments = await EventArtistPayment.find({ events_id, artist_id });
+    const payments = await EventArtistPayment.find({ events_id, artist_id })
+    .populate('events_id')   // Populate the event document
+    .populate('artist_id');  // Populate the artist document
 
     return reply.code(200).send({
       message: "Event payments fetched successfully",
