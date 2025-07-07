@@ -99,7 +99,7 @@ export const updateProperty = async (req, reply) => {
 
     if (!_id) {
       return reply.code(400).send({
-        message: 'Property ID is required for update',
+        message: "Property ID is required for update",
       });
     }
 
@@ -125,18 +125,18 @@ export const updateProperty = async (req, reply) => {
 
     if (!updatedProperty) {
       return reply.code(404).send({
-        message: 'Property not found',
+        message: "Property not found",
       });
     }
 
     return reply.code(200).send({
-      message: 'Property updated successfully',
+      message: "Property updated successfully",
       data: updatedProperty,
     });
   } catch (error) {
-    console.error('Error updating property:', error);
+    console.error("Error updating property:", error);
     return reply.code(500).send({
-      message: 'Failed to update property',
+      message: "Failed to update property",
       error: error.message,
     });
   }
@@ -158,7 +158,13 @@ export const getallProperty = async (req, reply) => {
     }
     const properties = await Property.find(filter)
       .sort({ createdAt: -1 })
-      .populate("payments"); 
+      .populate({
+        path: "payments",
+        populate: {
+          path: "property_id", 
+          model: "Property",
+        },
+      });
 
     return reply.code(200).send({
       message: "Properties fetched successfully",
@@ -169,6 +175,97 @@ export const getallProperty = async (req, reply) => {
     return reply.code(500).send({
       message: "Failed to fetch properties",
       error: error.message,
+    });
+  }
+};
+
+export const generateMonthlyBill = async (req, reply) => {
+  try {
+    const { property_id, month, startDate, endDate } = req.body;
+
+    console.log(property_id, month, startDate, endDate);
+
+    // Validate required fields
+    if (!property_id || !month || !startDate || !endDate) {
+      return reply.code(400).send({
+        success: false,
+        message: "Property ID, month, startDate, and endDate are required",
+      });
+    }
+
+    // Check if bill already exists
+    const existingBill = await PropertyPayment.findOne({ property_id, month });
+    if (existingBill) {
+      return reply.code(409).send({
+        success: false,
+        message: "Monthly bill already exists for this property and month",
+      });
+    }
+
+    // Find the property
+    const existingproperty = await Property.findById(property_id).populate(
+      "payments"
+    );
+
+    if (!existingproperty) {
+      return reply.code(404).send({
+        success: false,
+        message: "Property not found",
+      });
+    }
+
+    // Parse dates to Date objects
+    const parsedStartDate = new Date(startDate);
+    const parsedEndDate = new Date(endDate);
+
+    // Calculate billing components
+    const rent = existingproperty.rent || 0;
+    const maintenance = existingproperty.maintenanceAmount || 0;
+    const gstRate = 0.18;
+    const gst = parseFloat((rent * gstRate).toFixed(2));
+    const tdsRate = 0.1;
+    const tds = parseFloat((rent * tdsRate).toFixed(2));
+    const assessmentBill = 0; // update logic if needed
+    const finalAmount = rent + maintenance + gst - tds;
+
+    // Create and save payment bill
+    const payment = new PropertyPayment({
+      property_id,
+      month,
+      rent,
+      startDate: parsedStartDate,
+      endDate: parsedEndDate,
+      maintenance: {
+        whoPays: "Tenant",
+        amount: maintenance,
+      },
+      gst,
+      tds,
+      assessmentBill,
+      finalAmount,
+    });
+
+    const payment_id = await payment.save();
+    existingproperty.payments.push(payment_id._id);
+    await existingproperty.save();
+    const updatedProperty = await Property.findById(property_id).populate({
+      path: "payments",
+      populate: {
+        path: "property_id", // now this will work
+        model: "Property",
+      },
+    });
+
+    return reply.code(201).send({
+      success: true,
+      message: "Monthly bill generated successfully",
+      data: updatedProperty,
+    });
+  } catch (error) {
+    console.error("Error generating monthly bill:", error);
+    return reply.code(500).send({
+      success: false,
+      message: "Internal Server Error",
     });
   }
 };

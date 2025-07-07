@@ -58,6 +58,7 @@ export const newEventCreation = async (req, reply) => {
         $addToSet: { events: savedEvent._id }, // use $addToSet to avoid duplicates
       });
     }
+    
     for (let i = 0; i < sponsors.length; i++) {
       const newSponsorPayment = new EventSponsorPayment({
         events_id: savedEvent._id,

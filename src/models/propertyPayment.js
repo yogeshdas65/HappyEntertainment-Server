@@ -1,47 +1,35 @@
 import mongoose from "mongoose";
-import { type } from "os";
 
 const propertyPaymentSchema = new mongoose.Schema(
   {
     property_id: {
-      type: String,
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Property", 
       required: true,
     },
-    buildName: {
+    month: {
       type: String,
-      required: true,
-    },
-    tenantName: {
-      type: String,
-      required: true,
-    },
-    address: {
-      type: String,
-      required: true,
-    },
-    date: {
-      type: Date,
       required: true,
     },
     rent: {
       type: Number,
-      required: true,
+      default: 0,
     },
-    isPaid:{
-      type:Boolean,
-      required:true
+    isPaid: {
+      type: Boolean,
+      default: false,
     },
-    startDate:{
-      type:Date,
-      required:true
+    startDate: {
+      type: Date,
+      default: null,
     },
-    endDate:{
-      type:Date,
-      required:true
+    endDate: {
+      type: Date,
+      default: null,
     },
-    monthlyBill:{
-      type:String,
-      required:true
+    monthlyBill: {
+      type: String,
+      default: null,
     },
     pendingRent: {
       type: Number,
@@ -49,29 +37,29 @@ const propertyPaymentSchema = new mongoose.Schema(
     },
     gst: {
       type: Number,
-      required: true,
+      default: 0,
     },
     tds: {
       type: Number,
-      required: true,
+      default: 0,
     },
     assessmentBill: {
       type: Number,
-      required: true,
+      default: 0,
     },
     finalAmount: {
       type: Number,
-      required: true,
+      default: 0,
     },
     maintenance: {
       whoPays: {
         type: String,
         enum: ["Owner", "Tenant"],
-        required: true,
+        default: "Owner",
       },
       amount: {
         type: Number,
-        required: true,
+        default: 0,
       },
     },
     electricityBill: {
@@ -79,49 +67,39 @@ const propertyPaymentSchema = new mongoose.Schema(
         type: Boolean,
         default: false,
       },
+      isInstallment: {
+        type: Boolean,
+        default: false,
+      },
       amount: {
         type: Number,
-        required: true,
+        default: 0,
       },
     },
     rentInstallment: {
       isInstallment: {
         type: Boolean,
-        required: true,
-      },
-      amount: {
-        type: Number,
-        required: true,
+        default: false,
       },
     },
     maintenanceInstallment: {
       isInstallment: {
         type: Boolean,
-        required: true,
+        default: false,
       },
       amount: {
         type: Number,
-        required: true,
-      },
-    },
-    electricityInstallment: {
-      isInstallment: {
-        type: Boolean,
-        required: true,
-      },
-      amount: {
-        type: Number,
-        required: true,
+        default: 0,
       },
     },
     uploads: {
       paymentScreenshot: {
         type: String,
-        // required: true,
+        default: null,
       },
       monthlyBill: {
         type: String,
-        // required: true,
+        default: null,
       },
     },
   },
