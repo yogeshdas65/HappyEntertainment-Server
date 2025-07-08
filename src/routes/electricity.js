@@ -4,7 +4,8 @@ import {
   getSinglePlant,
   getBillTypeChoice,
   addBillForPlant,
-  uploadPaymentScreenShot,
+  updateBillPayment,
+  updatePeriodicBillPayment
 } from "../controllers/electricity/electricity.js";
 import { verifyToken } from "../middleware/auth.js";
 import multer from "fastify-multer";
@@ -31,8 +32,12 @@ export const electricityRoutes = async (fastify, options) => {
     preHandler: [verifyToken, upload.single("file")],
     handler: addBillForPlant,
   });
-  fastify.post("/upload-payment-screenshot", {
+  fastify.put("/update-bill-payment", {
     preHandler: [verifyToken, upload.single("file")],
-    handler: uploadPaymentScreenShot,
+    handler: updateBillPayment,
+  });
+  fastify.put("/update-periodic-bill-payment", {
+    preHandler: [verifyToken, upload.single("file")],
+    handler: updatePeriodicBillPayment,
   });
 };

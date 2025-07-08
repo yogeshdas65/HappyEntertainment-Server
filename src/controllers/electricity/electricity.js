@@ -13,23 +13,22 @@ const s3 = new S3Client({
 });
 
 export const newPlantCreation = async (req, reply) => {
-  
   const parts = await req.parts();
-  let plantName = '';
+  let plantName = "";
 
   for await (const part of parts) {
-    if (part.type === 'field' && part.fieldname === 'plantName') {
+    if (part.type === "field" && part.fieldname === "plantName") {
       plantName = part.value;
     }
   }
 
-  console.log('Parsed plantName:', plantName);
+  console.log("Parsed plantName:", plantName);
 
   // Step 1: Validate presence
-  if (!plantName || typeof plantName !== 'string' || plantName.trim() === '') {
+  if (!plantName || typeof plantName !== "string" || plantName.trim() === "") {
     return reply.code(400).send({
-      error: 'Validation Error',
-      message: 'Plant name is required and must be a non-empty string.',
+      error: "Validation Error",
+      message: "Plant name is required and must be a non-empty string.",
     });
   }
 
@@ -38,8 +37,8 @@ export const newPlantCreation = async (req, reply) => {
     const existing = await Electricity.findOne({ plantName: plantName.trim() });
     if (existing) {
       return reply.code(409).send({
-        error: 'Conflict',
-        message: 'A plant with this name already exists.',
+        error: "Conflict",
+        message: "A plant with this name already exists.",
       });
     }
 
@@ -64,14 +63,14 @@ export const newPlantCreation = async (req, reply) => {
     await newDoc.save();
 
     reply.code(201).send({
-      message: 'Electricity plant created successfully.',
+      message: "Electricity plant created successfully.",
       data: newDoc,
     });
   } catch (error) {
-    console.error('Error saving electricity data:', error);
+    console.error("Error saving electricity data:", error);
     reply.code(500).send({
-      error: 'Internal Server Error',
-      message: 'Failed to save electricity data.',
+      error: "Internal Server Error",
+      message: "Failed to save electricity data.",
     });
   }
 };
@@ -259,7 +258,7 @@ export const addBillForPlant = async (req, reply) => {
     if (useMonthlySchema) {
       // Add month & year
       const start = new Date(startDate);
-      bill.month = start.toLocaleString('default', { month: 'long' });
+      bill.month = start.toLocaleString("default", { month: "long" });
       bill.year = start.getFullYear();
     } else {
       // Add billNo for periodicBills only
@@ -286,40 +285,51 @@ export const addBillForPlant = async (req, reply) => {
     });
   } catch (error) {
     console.error("Error adding bill:", error);
-    return reply.code(500).send({ message: "Failed to add bill", error: error.message });
+    return reply
+      .code(500)
+      .send({ message: "Failed to add bill", error: error.message });
   }
 };
 
-export const uploadPaymentScreenShot = async (req, reply) => {
+export const updateBillPayment = async (req, reply) => {
   try {
-    const { _id, billType, bill_id } = req.body;
+    const { _id, billType, bill_id, isPaid, finalAmount } = req.body;
     const file = req.file;
 
-    console.log("test", _id, billType, bill_id , file)
-    
+    console.log("test", _id, billType, bill_id, file, isPaid, finalAmount);
 
-    if (!_id || !billType || !bill_id || !file) {
+    if (
+      !_id ||
+      !billType ||
+      !bill_id ||
+      isPaid == null ||
+      finalAmount == null
+    ) {
       return reply.code(400).send({ message: "Missing required fields" });
     }
 
-    // Upload screenshot to S3
-    const fileBuffer = fs.readFileSync(file.path);
-    const fileKey = `payment_screenshots/${Date.now()}_${file.originalname}`;
+    let paymentScreenshot = null;
 
-    const uploadParams = {
-      Bucket: process.env.S3_BUCKET_NAME,
-      Key: fileKey,
-      Body: fileBuffer,
-      ContentType: file.mimetype,
-    };
+    // Upload file to S3 if provided
+    if (file && file.path) {
+      const fileBuffer = fs.readFileSync(file.path);
+      const fileKey = `payment_screenshots/${Date.now()}_${file.originalname}`;
 
-    await s3.send(new PutObjectCommand(uploadParams));
-    const paymentScreenshot = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.S3_REGION}.amazonaws.com/${fileKey}`;
+      const uploadParams = {
+        Bucket: process.env.S3_BUCKET_NAME,
+        Key: fileKey,
+        Body: fileBuffer,
+        ContentType: file.mimetype,
+      };
 
-    // Delete local file
-    fs.unlinkSync(file.path);
+      await s3.send(new PutObjectCommand(uploadParams));
 
-    // Define bill path
+      paymentScreenshot = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.S3_REGION}.amazonaws.com/${fileKey}`;
+
+      fs.unlinkSync(file.path);
+    }
+
+    // Define valid bill types
     const periodicBillTypes = [
       "consultingFeesByOasis",
       "dsmAdviceBills",
@@ -327,70 +337,192 @@ export const uploadPaymentScreenShot = async (req, reply) => {
       "consultingFeesByEnrich",
       "amc",
     ];
+
     const electricityBillTypes = [
       "energyInvoice",
       "electricityBillForPlant",
       "challan",
     ];
 
-    let arrayPath = '';
-    let isPeriodic = false;
+    let arrayPath = "";
 
     if (periodicBillTypes.includes(billType)) {
       arrayPath = `periodicBills.${billType}`;
-      isPeriodic = true;
     } else if (electricityBillTypes.includes(billType)) {
       arrayPath = `electricityBill.${billType}`;
     } else {
       return reply.code(400).send({ message: "Invalid billType" });
     }
 
-    // Construct query & update
+    // Query to find and update nested document
     const updateQuery = {
       _id,
       [`${arrayPath}._id`]: bill_id,
     };
 
+    // Update operation
     const updateOperation = {
       $set: {
-        [`${arrayPath}.$.isPaid`]: true,
-        [`${arrayPath}.$.paymentScreenshot`]: paymentScreenshot,
+        [`${arrayPath}.$.isPaid`]: isPaid === "true",
+        [`${arrayPath}.$.finalAmount`]: Number(finalAmount),
       },
     };
 
-    const updatedDoc = await Electricity.findOneAndUpdate(updateQuery, updateOperation, {
-      new: true,
-    });
+    if (paymentScreenshot) {
+      updateOperation.$set[`${arrayPath}.$.paymentScreenshot`] =
+        paymentScreenshot;
+    }
+
+    const updatedDoc = await Electricity.findOneAndUpdate(
+      updateQuery,
+      updateOperation,
+      { new: true }
+    );
 
     if (!updatedDoc) {
-      return reply.code(404).send({ message: "Bill not found or Plant not found" });
+      return reply
+        .code(404)
+        .send({ message: "Bill not found or Plant not found" });
     }
 
     return reply.code(200).send({
-      message: "Payment screenshot uploaded and bill marked as paid",
+      message: "Bill marked as paid successfully",
       data: updatedDoc,
     });
   } catch (error) {
-    console.error("Error uploading payment screenshot:", error);
-    return reply.code(500).send({ message: "Internal Server Error", error: error.message });
+    console.error("Error updating bill payment:", error);
+    return reply
+      .code(500)
+      .send({ message: "Internal Server Error", error: error.message });
   }
 };
 
-// export const newPlantCreation = async (req, reply) => {
-//   const { plantName, periodicBills, electricityBill } = req.body;
-//   try {
-//     const newDoc = new Electricity({
-//       plantName,
-//       periodicBills,
-//       electricityBill,
-//     });
-//     await newDoc.save();
-//     console.log("Electricity data saved successfully.");
-//     reply
-//       .code(201)
-//       .send({ message: "Electricity data saved successfully.", data: newDoc });
-//   } catch (error) {
-//     console.error("Error saving electricity data:", error);
-//     reply.code(500).send({ error: "Failed to save electricity data." });
-//   }
-// };
+export const updatePeriodicBillPayment = async (req, reply) => {
+  try {
+    const {
+      _id,
+      billType,
+      bill_id,
+      isPaid,
+      startDate,
+      maintenanceAmount,
+      finalAmount,
+    } = req.body;
+    const file = req.file;
+
+    console.log(
+      "test",
+      _id,
+      billType,
+      bill_id,
+      startDate,
+      file,
+      isPaid,
+      maintenanceAmount,
+      finalAmount
+    );
+
+    if (
+      !_id ||
+      !billType ||
+      !bill_id ||
+      isPaid == null ||
+      !maintenanceAmount ||
+      !startDate ||
+      !finalAmount == null
+    ) {
+      return reply.code(400).send({ message: "Missing required fields" });
+    }
+
+    let paymentScreenshot = null;
+
+    // Upload file to S3 if provided
+    if (file && file.path) {
+      const fileBuffer = fs.readFileSync(file.path);
+      const fileKey = `payment_screenshots/${Date.now()}_${file.originalname}`;
+
+      const uploadParams = {
+        Bucket: process.env.S3_BUCKET_NAME,
+        Key: fileKey,
+        Body: fileBuffer,
+        ContentType: file.mimetype,
+      };
+
+      await s3.send(new PutObjectCommand(uploadParams));
+
+      paymentScreenshot = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.S3_REGION}.amazonaws.com/${fileKey}`;
+
+      fs.unlinkSync(file.path);
+    }
+
+    // Define valid bill types
+    const periodicBillTypes = [
+      "consultingFeesByOasis",
+      "dsmAdviceBills",
+      "forecastingAndSchedulingBills",
+      "consultingFeesByEnrich",
+      "amc",
+    ];
+
+    const electricityBillTypes = [
+      "energyInvoice",
+      "electricityBillForPlant",
+      "challan",
+    ];
+
+    let arrayPath = "";
+
+    if (periodicBillTypes.includes(billType)) {
+      arrayPath = `periodicBills.${billType}`;
+    } else if (electricityBillTypes.includes(billType)) {
+      arrayPath = `electricityBill.${billType}`;
+    } else {
+      return reply.code(400).send({ message: "Invalid billType" });
+    }
+
+    // Query to find and update nested document
+    const updateQuery = {
+      _id,
+      [`${arrayPath}._id`]: bill_id,
+    };
+
+    // Update operation
+    const updateOperation = {
+      $set: {
+        [`${arrayPath}.$.isPaid`]: isPaid === "true",
+        [`${arrayPath}.$.finalAmount`]: Number(finalAmount),
+        [`${arrayPath}.$.maintenanceAmount`]: Number(maintenanceAmount),
+      },
+    };
+
+    if (paymentScreenshot) {
+      updateOperation.$set[`${arrayPath}.$.paymentScreenshot`] =
+        paymentScreenshot;
+    }
+    if (startDate) {
+      updateOperation.$set[`${arrayPath}.$.startDate`] = new Date(startDate);
+    }
+    console.log(updateOperation);
+    const updatedDoc = await Electricity.findOneAndUpdate(
+      updateQuery,
+      updateOperation,
+      { new: true }
+    );
+
+    if (!updatedDoc) {
+      return reply
+        .code(404)
+        .send({ message: "Bill not found or Plant not found" });
+    }
+
+    return reply.code(200).send({
+      message: "Bill marked as paid successfully",
+      data: updatedDoc,
+    });
+  } catch (error) {
+    console.error("Error updating bill payment:", error);
+    return reply
+      .code(500)
+      .send({ message: "Internal Server Error", error: error.message });
+  }
+};
