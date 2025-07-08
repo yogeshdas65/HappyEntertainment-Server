@@ -5,7 +5,8 @@ import {
   getBillTypeChoice,
   addBillForPlant,
   updateBillPayment,
-  updatePeriodicBillPayment
+  updatePeriodicBillPayment,
+  updatePlantName,
 } from "../controllers/electricity/electricity.js";
 import { verifyToken } from "../middleware/auth.js";
 import multer from "fastify-multer";
@@ -15,6 +16,10 @@ export const electricityRoutes = async (fastify, options) => {
   fastify.post("/create-new-plant", {
     preHandler: [verifyToken],
     handler: newPlantCreation,
+  });
+  fastify.put("/update-plantname", {
+    preHandler: [verifyToken, upload.single("file")],
+    handler: updatePlantName,
   });
   fastify.get("/get-all-plants", {
     preHandler: [verifyToken],

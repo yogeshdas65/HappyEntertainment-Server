@@ -75,6 +75,44 @@ export const newPlantCreation = async (req, reply) => {
   }
 };
 
+export const updatePlantName = async (req, reply) => {
+  try {
+    const { _id, plantName } = req.body;
+
+    // Validate
+    if (!_id || !plantName || typeof plantName !== "string" || plantName.trim() === "") {
+      return reply.code(400).send({
+        error: "Validation Error",
+        message: "_id and plantName are required and must be valid.",
+      });
+    }
+
+    // Check if plant exists
+    const existing = await Electricity.findById(_id);
+    if (!existing) {
+      return reply.code(404).send({
+        error: "Not Found",
+        message: "Plant not found with the given ID.",
+      });
+    }
+
+    // Update and save
+    existing.plantName = plantName.trim();
+    await existing.save();
+
+    return reply.code(200).send({
+      message: "Plant name updated successfully.",
+      data: existing,
+    });
+  } catch (error) {
+    console.error("Error updating plant name:", error);
+    return reply.code(500).send({
+      error: "Internal Server Error",
+      message: "Failed to update plant name.",
+    });
+  }
+};
+
 export const getPlantNames = async (req, reply) => {
   try {
     const { id } = req.params;
