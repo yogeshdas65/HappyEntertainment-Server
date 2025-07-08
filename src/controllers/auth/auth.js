@@ -118,6 +118,40 @@ export const createUser = async (request, reply) => {
   }
 };
 
+export const changePassword = async (req, reply) => {
+  try {
+    const { userId, role } = req.user; // decoded from token
+    const { employeeId, newPassword } = req.body;
+
+    // Only admins are allowed
+    if (role !== "ADMIN") {
+      return reply.code(403).send({ message: "Access denied. Admins only." });
+    }
+
+    if (!employeeId || !newPassword || newPassword.length < 6) {
+      return reply.code(400).send({
+        message: "Employee ID and a valid password (min 6 characters) are required.",
+      });
+    }
+
+    // Find employee
+    const employee = await User.findOne({ _id: employeeId, role: "EMPLOYEE" });
+    if (!employee) {
+      return reply.code(404).send({ message: "Employee not found." });
+    }
+
+    // Update password
+    employee.password = newPassword; // hash it if using bcrypt (see below)
+    employee.updatedAt = new Date();
+    await employee.save();
+
+    return reply.code(200).send({ message: "Password updated successfully." });
+  } catch (error) {
+    console.error("Error changing password:", error);
+    return reply.code(500).send({ message: "Server error changing password." });
+  }
+};
+
 export const fetchEmployee = async (req, reply) => {
   const { userId, role } = req.user;
 
@@ -126,11 +160,25 @@ export const fetchEmployee = async (req, reply) => {
   }
 
   try {
-    const employees = await User.find({ role: "EMPLOYEE" });
-    return reply.send(employees);
+    const { name } = req.query;
+
+    const filter = {
+      role: "EMPLOYEE",
+      ...(name && {
+        name: { $regex: name, $options: "i" }, // case-insensitive match
+      }),
+    };
+
+    const employees = await User.find(filter);
+    return reply.send({
+      message: "Employees fetched successfully",
+      data: employees,
+    });
   } catch (error) {
     console.error("Error fetching employees:", error);
-    return reply.code(500).send({ message: "Server error while fetching employees." });
+    return reply
+      .code(500)
+      .send({ message: "Server error while fetching employees." });
   }
 };
 

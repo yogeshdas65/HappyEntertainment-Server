@@ -115,25 +115,24 @@ export const updatePlantName = async (req, reply) => {
 
 export const getPlantNames = async (req, reply) => {
   try {
-    const { id } = req.params;
+    const { name } = req.query;
 
-    let data;
+    const filter = name
+      ? { plantName: { $regex: name, $options: "i" } } 
+      : {};
 
-    if (id) {
-      data = await Electricity.findById(id).select("_id plantName");
-      if (!data) {
-        return reply.code(404).send({ message: "Plant not found" });
-      }
-    } else {
-      data = await Electricity.find().select("_id plantName");
-    }
+    const data = await Electricity.find(filter).select("_id plantName");
 
-    reply
-      .code(200)
-      .send({ message: "Plant name(s) fetched successfully", data });
+    return reply.code(200).send({
+      message: "Plant name(s) fetched successfully",
+      data,
+    });
   } catch (error) {
     console.error("Error fetching plant names:", error);
-    reply.code(500).send({ error: "Failed to fetch plant names" });
+    return reply.code(500).send({
+      error: "Failed to fetch plant names",
+      details: error.message,
+    });
   }
 };
 
