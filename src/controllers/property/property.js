@@ -161,7 +161,7 @@ export const getallProperty = async (req, reply) => {
       .populate({
         path: "payments",
         populate: {
-          path: "property_id", 
+          path: "property_id",
           model: "Property",
         },
       });
@@ -266,6 +266,115 @@ export const generateMonthlyBill = async (req, reply) => {
     return reply.code(500).send({
       success: false,
       message: "Internal Server Error",
+    });
+  }
+};
+
+export const updateMonthlyBill = async (req, reply) => {
+  try {
+    const {
+      id,
+      isPaid,
+      finalAmount,
+      isInstallment,
+      whoPaysMaintenance,
+      isMaintenanceInstallment,
+      maintenanceAmount,
+      isElectricityPaid,
+      isElectricityInstallment,
+      electricityAmount,
+    } = req.body;
+    console.log( id,
+      "isPaid" , isPaid,
+      finalAmount,
+      isInstallment,
+      whoPaysMaintenance,
+      isMaintenanceInstallment,
+      maintenanceAmount,
+      isElectricityPaid,
+      isElectricityInstallment,
+      electricityAmount)
+
+    const files = req.files || {};
+    const paymentScreenshot = files["paymentScreenshot"]?.[0] || null;
+    const monthlyBill = files["monthlyBill"]?.[0] || null;
+
+    const updateData = {
+      isPaid: isPaid === "true",
+      finalAmount: Number(finalAmount),
+      rentInstallment: {
+        isInstallment: isInstallment === "true",
+      },
+      maintenance: {
+        whoPays: whoPaysMaintenance,
+        amount: Number(maintenanceAmount),
+      },
+      maintenanceInstallment: {
+        isInstallment: isMaintenanceInstallment === "true",
+        amount: Number(maintenanceAmount),
+      },
+      electricityBill: {
+        isPaid: isElectricityPaid === "true",
+        isInstallment: isElectricityInstallment === "true",
+        amount: Number(electricityAmount),
+      },
+      uploads: {},
+    };
+
+    // Upload paymentScreenshot to S3
+    if (paymentScreenshot) {
+      const fileKey = `property_payments/screenshots/${Date.now()}_${paymentScreenshot.originalname}`;
+      const uploadParams = {
+        Bucket: process.env.S3_BUCKET_NAME,
+        Key: fileKey,
+        Body: paymentScreenshot.buffer,
+        ContentType: paymentScreenshot.mimetype,
+      };
+
+      await s3.send(new PutObjectCommand(uploadParams));
+
+      const fileUrl = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.S3_REGION}.amazonaws.com/${fileKey}`;
+      updateData.uploads.paymentScreenshot = fileUrl;
+    }
+
+    // Upload monthlyBill to S3
+    if (monthlyBill) {
+      const fileKey = `property_payments/bills/${Date.now()}_${monthlyBill.originalname}`;
+      const uploadParams = {
+        Bucket: process.env.S3_BUCKET_NAME,
+        Key: fileKey,
+        Body: monthlyBill.buffer,
+        ContentType: monthlyBill.mimetype,
+      };
+
+      await s3.send(new PutObjectCommand(uploadParams));
+
+      const fileUrl = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.S3_REGION}.amazonaws.com/${fileKey}`;
+      updateData.uploads.monthlyBill = fileUrl;
+    }
+
+    const updated = await PropertyPayment.findByIdAndUpdate(id, updateData, {
+      new: true,
+    }).populate("property_id");
+
+    if (!updated) {
+      return reply.code(404).send({
+        success: false,
+        message: "Payment not found",
+      });
+    }
+
+    return reply.send({
+      success: true,
+      message: "Monthly bill updated successfully",
+      data: updated,
+    });
+  } catch (error) {
+    console.error("Update monthly bill error:", error);
+    return reply.code(500).send({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message,
     });
   }
 };

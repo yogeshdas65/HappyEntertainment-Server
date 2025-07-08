@@ -3,7 +3,8 @@ import {
   updateProperty,
   getallProperty,
   makePayment,
-  generateMonthlyBill
+  generateMonthlyBill,
+  updateMonthlyBill,
 } from "../controllers/property/property.js";
 import { verifyToken } from "../middleware/auth.js";
 import multer from "fastify-multer";
@@ -25,6 +26,16 @@ export const propertyRoutes = async (fastify, options) => {
   fastify.post("/create-new-monthly-bill", {
     preHandler: [verifyToken, upload.single("file")],
     handler: generateMonthlyBill,
+  });
+  fastify.put("/update-monthly-bill", {
+    preHandler: [
+      verifyToken,
+      upload.fields([
+        { name: "paymentScreenshot", maxCount: 1 },
+        { name: "monthlyBill", maxCount: 1 },
+      ]),
+    ],
+    handler: updateMonthlyBill,
   });
   fastify.post("/make-payment-for-property", {
     preHandler: [verifyToken, upload.single("file")],
